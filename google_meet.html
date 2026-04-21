@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Google Meet — Animation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px; height: 1080px;
+      background: #f6f3f3;
+      overflow: hidden;
+      font-family: -apple-system, 'Helvetica Neue', sans-serif;
+    }
+    #stage { width: 1920px; height: 1080px; position: relative; overflow: hidden; }
+    #canvas { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; }
+  </style>
+</head>
+<body>
+<div id="stage"><div id="canvas"></div></div>
+<script>
+const W = 1920, H = 1080, CX = W / 2;
+const canvas = document.getElementById('canvas');
+
+// ─── Easing ───────────────────────────────────────────────────────
+function lerp(a, b, t) { return a + (b - a) * t; }
+function eout(t) { return 1 - Math.pow(1 - t, 3); }
+function eio(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3) / 2; }
+function eoutBack(t) {
+  const c1 = 1.70158, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+// ─── RAF helpers ──────────────────────────────────────────────────
+function tw(dur, fn) {
+  return new Promise(res => {
+    const s = performance.now();
+    (function tick(now) {
+      const t = Math.min((now - s) / dur, 1);
+      fn(t);
+      if (t < 1) requestAnimationFrame(tick); else res();
+    })(performance.now());
+  });
+}
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── Dimensions ───────────────────────────────────────────────────
+const WIN_W = 720, WIN_H = 480;
+const WIN_X = CX - WIN_W / 2, WIN_Y = H / 2 - WIN_H / 2;
+const CHROME_H = 32, HEADER_H = 40, CTRL_H = 56;
+const VID_W = WIN_W, VID_H = WIN_H - CHROME_H - HEADER_H - CTRL_H; // 352
+const GAP = 4, PAD = 4;
+
+// ─── Layout calculator ────────────────────────────────────────────
+function getLayout(n) {
+  const aw = VID_W - PAD * 2, ah = VID_H - PAD * 2;
+  if (n === 1) return [{ x: PAD, y: PAD, w: aw, h: ah }];
+  if (n === 2) {
+    const w = (aw - GAP) / 2;
+    return [
+      { x: PAD, y: PAD, w, h: ah },
+      { x: PAD + w + GAP, y: PAD, w, h: ah },
+    ];
+  }
+  if (n === 3) {
+    const w = (aw - GAP * 2) / 3;
+    return [
+      { x: PAD, y: PAD, w, h: ah },
+      { x: PAD + w + GAP, y: PAD, w, h: ah },
+      { x: PAD + (w + GAP) * 2, y: PAD, w, h: ah },
+    ];
+  }
+  if (n === 4) {
+    const w = (aw - GAP) / 2, h = (ah - GAP) / 2;
+    return [
+      { x: PAD, y: PAD, w, h },
+      { x: PAD + w + GAP, y: PAD, w, h },
+      { x: PAD, y: PAD + h + GAP, w, h },
+      { x: PAD + w + GAP, y: PAD + h + GAP, w, h },
+    ];
+  }
+  if (n === 5) {
+    const w2 = (aw - GAP) / 2, w3 = (aw - GAP * 2) / 3, h = (ah - GAP) / 2;
+    return [
+      { x: PAD, y: PAD, w: w2, h },
+      { x: PAD + w2 + GAP, y: PAD, w: w2, h },
+      { x: PAD, y: PAD + h + GAP, w: w3, h },
+      { x: PAD + w3 + GAP, y: PAD + h + GAP, w: w3, h },
+      { x: PAD + (w3 + GAP) * 2, y: PAD + h + GAP, w: w3, h },
+    ];
+  }
+  return [];
+}
+
+// ─── Participants ─────────────────────────────────────────────────
+const PARTS = [
+  { name: 'Théo Gouman', avatar: 'https://res.cloudinary.com/dceobxyts/image/upload/v1776794023/Avatar_nboukr.jpg', color: '#e0625a' },
+  { name: 'Sophie B.',   initials: 'SB', color: '#4285F4' },
+  { name: 'Marc L.',     initials: 'ML', color: '#34A853' },
+  { name: 'Claire D.',   initials: 'CD', color: '#9C27B0' },
+  { name: 'Lucas R.',    initials: 'LR', color: '#F4A400' },
+];
+
+// ─── Build Meet window ────────────────────────────────────────────
+const win = document.createElement('div');
+win.style.cssText = `
+  position: absolute;
+  left: ${WIN_X}px; top: ${WIN_Y}px;
+  width: ${WIN_W}px; height: ${WIN_H}px;
+  display: flex; flex-direction: column;
+  border: 2px solid #e0625a;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.12);
+  opacity: 0;
+  transform: scale(0.4);
+  transform-origin: center;
+`;
+canvas.appendChild(win);
+
+// Browser chrome
+const chromeBar = document.createElement('div');
+chromeBar.style.cssText = `
+  width: 100%; height: ${CHROME_H}px;
+  background: #EBEBEB;
+  display: flex; align-items: center;
+  padding: 0 10px; gap: 6px;
+  border-bottom: 1px solid #D0D0D0;
+  flex-shrink: 0;
+`;
+['#FF5F57', '#FEBC2E', '#28C840'].forEach(c => {
+  const d = document.createElement('div');
+  d.style.cssText = `width: 10px; height: 10px; border-radius: 50%; background: ${c}; flex-shrink: 0;`;
+  chromeBar.appendChild(d);
+});
+const urlBar = document.createElement('div');
+urlBar.style.cssText = `
+  flex: 1; height: 18px; background: #fff;
+  border-radius: 9px; border: 1px solid #CCC;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9.5px; color: #555; margin: 0 8px;
+`;
+urlBar.textContent = '🔒 meet.google.com/abc-defg-hij';
+chromeBar.appendChild(urlBar);
+win.appendChild(chromeBar);
+
+// Meet header
+const meetHdr = document.createElement('div');
+meetHdr.style.cssText = `
+  width: 100%; height: ${HEADER_H}px;
+  background: #202124;
+  display: flex; align-items: center;
+  padding: 0 14px; gap: 8px;
+  flex-shrink: 0;
+`;
+const logo = document.createElement('div');
+logo.innerHTML =
+  '<span style="font-size:12px;font-weight:700">' +
+  '<span style="color:#4285F4">G</span><span style="color:#EA4335">o</span>' +
+  '<span style="color:#FBBC04">o</span><span style="color:#4285F4">g</span>' +
+  '<span style="color:#34A853">l</span><span style="color:#EA4335">e</span>' +
+  '</span><span style="color:#e8eaed;font-size:12px;font-weight:600;margin-left:5px;">Meet</span>';
+meetHdr.appendChild(logo);
+const hSpacer = document.createElement('div');
+hSpacer.style.flex = '1';
+meetHdr.appendChild(hSpacer);
+const callTimer = document.createElement('div');
+callTimer.style.cssText = `color: #9AA0A6; font-size: 11px; margin-right: 8px;`;
+callTimer.textContent = '0:00';
+meetHdr.appendChild(callTimer);
+const countBadge = document.createElement('div');
+countBadge.style.cssText = `
+  background: #3c4043; color: #e8eaed;
+  border-radius: 10px; padding: 2px 8px;
+  font-size: 10px; font-weight: 500;
+  display: flex; align-items: center; gap: 4px;
+`;
+countBadge.innerHTML = '<span>👥</span><span id="pCount">1</span>';
+meetHdr.appendChild(countBadge);
+win.appendChild(meetHdr);
+
+// Video area
+const videoArea = document.createElement('div');
+videoArea.style.cssText = `
+  position: relative;
+  width: ${VID_W}px; height: ${VID_H}px;
+  background: #111; flex-shrink: 0; overflow: hidden;
+`;
+win.appendChild(videoArea);
+
+// Controls bar
+const ctrlBar = document.createElement('div');
+ctrlBar.style.cssText = `
+  width: 100%; height: ${CTRL_H}px;
+  background: #202124;
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; flex-shrink: 0;
+`;
+[
+  { icon: '🎤', bg: '#3c4043', sz: 36 },
+  { icon: '📷', bg: '#3c4043', sz: 36 },
+  { icon: '📵', bg: '#ea4335', sz: 42 },
+  { icon: '💬', bg: '#3c4043', sz: 36 },
+  { icon: '⋮',  bg: '#3c4043', sz: 36 },
+].forEach(b => {
+  const btn = document.createElement('div');
+  btn.style.cssText = `
+    width: ${b.sz}px; height: ${b.sz}px; border-radius: 50%;
+    background: ${b.bg};
+    display: flex; align-items: center; justify-content: center;
+    font-size: ${b.sz === 42 ? 16 : 13}px;
+  `;
+  btn.textContent = b.icon;
+  ctrlBar.appendChild(btn);
+});
+win.appendChild(ctrlBar);
+
+// ─── Tile factory ─────────────────────────────────────────────────
+function makeTile(p) {
+  const tile = document.createElement('div');
+  tile.style.cssText = `
+    position: absolute;
+    background: #1c1c1e;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  `;
+  const avWrap = document.createElement('div');
+  avWrap.style.cssText = `
+    width: 64px; height: 64px; border-radius: 50%; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: ${p.color};
+    border: 2.5px solid rgba(255,255,255,.2);
+    flex-shrink: 0;
+  `;
+  if (p.avatar) {
+    const img = document.createElement('img');
+    img.src = p.avatar;
+    img.crossOrigin = 'anonymous';
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+    avWrap.appendChild(img);
+  } else {
+    avWrap.style.fontSize = '21px';
+    avWrap.style.fontWeight = '700';
+    avWrap.style.color = '#fff';
+    avWrap.style.letterSpacing = '-0.5px';
+    avWrap.textContent = p.initials;
+  }
+  tile.appendChild(avWrap);
+
+  const nameTag = document.createElement('div');
+  nameTag.style.cssText = `
+    position: absolute; bottom: 7px; left: 8px;
+    background: rgba(0,0,0,.6); color: #fff;
+    font-size: 10px; font-weight: 500;
+    padding: 2px 7px; border-radius: 4px;
+    white-space: nowrap;
+    max-width: calc(100% - 16px);
+    overflow: hidden; text-overflow: ellipsis;
+  `;
+  nameTag.textContent = p.name;
+  tile.appendChild(nameTag);
+
+  const mic = document.createElement('div');
+  mic.style.cssText = `
+    position: absolute; bottom: 8px; right: 8px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #34A853;
+  `;
+  tile.appendChild(mic);
+
+  return tile;
+}
+
+// ─── Toast ────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = `
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    background: rgba(32,33,36,.92); color: #e8eaed;
+    font-size: 10px; font-weight: 500;
+    padding: 4px 12px; border-radius: 10px;
+    white-space: nowrap; opacity: 0; z-index: 20;
+  `;
+  t.textContent = msg;
+  videoArea.appendChild(t);
+  tw(200, p => { t.style.opacity = String(eout(p)); })
+    .then(() => wait(1500))
+    .then(() => tw(250, p => { t.style.opacity = String(1 - p); }))
+    .then(() => t.remove());
+}
+
+// ─── Tile state ───────────────────────────────────────────────────
+const tileData = []; // { el, cur: {x, y, w, h} }
+
+// ─── Add participant with layout transition ────────────────────────
+async function addParticipant(idx) {
+  const p = PARTS[idx];
+  const n = idx + 1;
+  const layout = getLayout(n);
+
+  showToast(`${p.name} a rejoint l'appel`);
+
+  const fromPos = tileData.map(td => ({ ...td.cur }));
+  const toPos = layout.slice(0, idx);
+
+  const newTile = makeTile(p);
+  const nl = layout[idx];
+  Object.assign(newTile.style, {
+    left: nl.x + 'px', top: nl.y + 'px',
+    width: nl.w + 'px', height: nl.h + 'px',
+    opacity: '0', transform: 'scale(0.5)',
+  });
+  videoArea.appendChild(newTile);
+
+  await tw(600, t => {
+    const ep = eio(t);
+    tileData.forEach((td, i) => {
+      const f = fromPos[i], to = toPos[i];
+      td.el.style.left   = lerp(f.x, to.x, ep) + 'px';
+      td.el.style.top    = lerp(f.y, to.y, ep) + 'px';
+      td.el.style.width  = lerp(f.w, to.w, ep) + 'px';
+      td.el.style.height = lerp(f.h, to.h, ep) + 'px';
+    });
+    if (t > 0.55) {
+      const nt = (t - 0.55) / 0.45;
+      newTile.style.opacity = String(Math.min(1, nt * 1.8));
+      newTile.style.transform = `scale(${lerp(0.5, 1, eoutBack(nt))})`;
+    }
+  });
+
+  tileData.forEach((td, i) => {
+    const to = toPos[i];
+    td.cur = { ...to };
+    td.el.style.left = to.x + 'px'; td.el.style.top = to.y + 'px';
+    td.el.style.width = to.w + 'px'; td.el.style.height = to.h + 'px';
+  });
+  newTile.style.opacity = '1';
+  newTile.style.transform = 'none';
+  tileData.push({ el: newTile, cur: { ...nl } });
+
+  document.getElementById('pCount').textContent = String(n);
+}
+
+// ─── Timer ────────────────────────────────────────────────────────
+let timerSec = 0, timerRef = null;
+function startTimer() {
+  timerSec = 0;
+  timerRef = setInterval(() => {
+    timerSec++;
+    const m = Math.floor(timerSec / 60);
+    const s = timerSec % 60;
+    callTimer.textContent = `${m}:${String(s).padStart(2, '0')}`;
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerRef); }
+
+// ─── Main loop ────────────────────────────────────────────────────
+async function main() {
+  await wait(500);
+
+  // Window pop in
+  await tw(600, t => {
+    win.style.opacity = String(Math.min(1, t * 2));
+    win.style.transform = `scale(${lerp(0.4, 1, eoutBack(t))})`;
+  });
+  win.style.transform = 'none';
+  startTimer();
+
+  await wait(400);
+
+  // Théo appears alone
+  const tile0 = makeTile(PARTS[0]);
+  const l0 = getLayout(1)[0];
+  Object.assign(tile0.style, {
+    left: l0.x + 'px', top: l0.y + 'px',
+    width: l0.w + 'px', height: l0.h + 'px',
+    opacity: '0', transform: 'scale(0.7)',
+  });
+  videoArea.appendChild(tile0);
+  tileData.push({ el: tile0, cur: { ...l0 } });
+
+  await tw(450, t => {
+    tile0.style.opacity = String(eout(t));
+    tile0.style.transform = `scale(${lerp(0.7, 1, eoutBack(t))})`;
+  });
+  tile0.style.transform = 'none';
+
+  await wait(900);
+
+  // Participants 2→5 join
+  for (let i = 1; i <= 4; i++) {
+    await addParticipant(i);
+    await wait(i < 4 ? 750 : 1200);
+  }
+
+  // Fade out
+  stopTimer();
+  await tw(600, t => { canvas.style.opacity = String(1 - t); });
+
+  // Reset for loop
+  await wait(700);
+  canvas.style.opacity = '1';
+  tileData.length = 0;
+  videoArea.innerHTML = '';
+  win.style.opacity = '0';
+  win.style.transform = 'scale(0.4)';
+  callTimer.textContent = '0:00';
+  document.getElementById('pCount').textContent = '1';
+
+  main();
+}
+
+main();
+</script>
+</body>
+</html>
