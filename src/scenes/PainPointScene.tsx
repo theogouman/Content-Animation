@@ -12,6 +12,7 @@ import {
 const IMAGE_URL = 'https://res.cloudinary.com/dceobxyts/image/upload/v1776887625/Capture_d_e%CC%81cran_2026-04-22_a%CC%80_21.36.18_znjbf4.png';
 
 const ACCENT = '#e0625a';
+const SCENE_BG = '#f6f3f3';
 
 // ─── Timeline (185 frames ≈ 6.2 s @ 30 fps) ──────────────────────────────────
 const T = {
@@ -31,23 +32,25 @@ const T = {
 // ─── World layout ─────────────────────────────────────────────────────────────
 const CX = 960;
 
-const IMG_W      = 700;
-const IMG_H      = 420;
+// Image — larger container, objectFit:contain to show full image
+const IMG_W      = 780;
+const IMG_H      = 490; // ~16:10 ratio, covers most common screenshot formats
 const IMG_RADIUS = 20;
 const IMAGE_Y    = 300; // world center Y
 
-const BOX1_Y = 660;
-const BOX2_Y = 748;
+// Text boxes — positioned below image with breathing room
+const BOX1_Y = 720;
+const BOX2_Y = 832;
 
-const CAM_0 = 540 - IMAGE_Y;                        // +240
-const CAM_1 = 540 - BOX1_Y;                         // -120
-const CAM_2 = 540 - Math.round((BOX1_Y + BOX2_Y) / 2); // -162
+const CAM_0 = 540 - IMAGE_Y;                        // +240 — image centered
+const CAM_1 = 540 - BOX1_Y;                         // -180 — box 1 centered
+const CAM_2 = 540 - Math.round((BOX1_Y + BOX2_Y) / 2); // -236 — both boxes centered
 
 // ─── Text box constants ───────────────────────────────────────────────────────
-const BOX_PAD_V  = 18;
-const BOX_PAD_H  = 30;
-const BOX_RADIUS = 14;
-const BOX_FONT   = 28;
+const BOX_PAD_V  = 26;
+const BOX_PAD_H  = 42;
+const BOX_RADIUS = 16;
+const BOX_FONT   = 36;
 const BOX_BORDER = 2;
 const BOX_FONT_STACK = "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
 
@@ -69,23 +72,22 @@ const XBadge: React.FC<{ scale: number; opacity: number }> = ({ scale, opacity }
   <div style={{
     position: 'absolute',
     top: -14, right: -14,
-    width: 28, height: 28,
+    width: 30, height: 30,
     borderRadius: '50%',
     background: ACCENT,
-    border: '2px solid #fff',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     color: '#ffffff',
-    fontSize: 13, fontWeight: 700, lineHeight: 1,
+    fontSize: 14, fontWeight: 700, lineHeight: 1,
     transform: `scale(${scale})`,
     transformOrigin: 'center',
     opacity,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+    boxShadow: '0 2px 10px rgba(224,98,90,0.5)',
   }}>
     ✖
   </div>
 );
 
-// ─── Text card ────────────────────────────────────────────────────────────────
+// ─── Text card — white bg, black text, red border ────────────────────────────
 const TextCard: React.FC<{
   y: number; text: string;
   scale: number; opacity: number;
@@ -97,18 +99,17 @@ const TextCard: React.FC<{
     transform: `translate(-50%, -50%) scale(${scale})`,
     transformOrigin: 'center',
     opacity,
-    // visual
     border: `${BOX_BORDER}px solid ${ACCENT}`,
     borderRadius: BOX_RADIUS,
-    background: '#000000',
+    background: '#ffffff',
     padding: `${BOX_PAD_V}px ${BOX_PAD_H}px`,
-    color: '#ffffff',
+    color: '#000000',
     fontFamily: BOX_FONT_STACK,
     fontSize: BOX_FONT,
     fontWeight: 600,
     lineHeight: 1,
     whiteSpace: 'nowrap',
-    boxShadow: '0 4px 28px rgba(0,0,0,0.3)',
+    boxShadow: '0 4px 28px rgba(0,0,0,0.10)',
   }}>
     {text}
     {showX && <XBadge scale={xScale} opacity={xOpacity} />}
@@ -121,19 +122,19 @@ export const PainPointScene: React.FC = () => {
   const { fps } = useVideoConfig();
 
   // ── Image slide-in ───────────────────────────────────────────────────────────
-  const imageWorldY = spring({ frame, fps, from: 900, to: IMAGE_Y,
+  const imageWorldY = spring({ frame, fps, from: 960, to: IMAGE_Y,
     config: { damping: 22, stiffness: 115 } });
   const imageOpacity = fadeIn(frame, 0, 14);
 
   // ── Float oscillation ────────────────────────────────────────────────────────
-  const elapsed  = Math.max(0, frame - T.floatStart);
-  const rotX     = Math.sin(elapsed * 0.030) * 2.0;          // ±2° avant/arrière
-  const rotZ     = Math.sin(elapsed * 0.025 + 0.8) * 1.2;   // ±1.2° rotation
-  const bobY     = Math.sin(elapsed * 0.040) * 5;            // ±5px vertical
-  const swayX    = Math.sin(elapsed * 0.028 + 1.2) * 4;     // ±4px horizontal
+  const elapsed = Math.max(0, frame - T.floatStart);
+  const rotX    = Math.sin(elapsed * 0.030) * 2.0;
+  const rotZ    = Math.sin(elapsed * 0.025 + 0.8) * 1.2;
+  const bobY    = Math.sin(elapsed * 0.040) * 5;
+  const swayX   = Math.sin(elapsed * 0.028 + 1.2) * 4;
   const floatTransform = `perspective(1200px) rotateX(${rotX}deg) rotateZ(${rotZ}deg) translateY(${bobY}px) translateX(${swayX}px)`;
 
-  // ── Glow (pulsing in sync with float) ────────────────────────────────────────
+  // ── Glow ─────────────────────────────────────────────────────────────────────
   const glowBuild = interpolate(frame, [0, 22], [0, 1],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
   const glowPulse = 1 + Math.sin(elapsed * 0.040) * 0.18;
@@ -145,7 +146,7 @@ export const PainPointScene: React.FC = () => {
     `0 0 120px rgba(224,98,90,${+(0.20 * g).toFixed(3)})`,
   ].join(', ');
 
-  // ── Camera (3-stop pan) ──────────────────────────────────────────────────────
+  // ── Camera ───────────────────────────────────────────────────────────────────
   const cameraY = interpolate(
     frame,
     [T.cam1Start, T.cam1End, T.cam2Start, T.cam2End],
@@ -154,15 +155,15 @@ export const PainPointScene: React.FC = () => {
   );
 
   // ── Box animations ───────────────────────────────────────────────────────────
-  const box1Scale  = smoothPop(frame, fps, T.box1Start);
+  const box1Scale   = smoothPop(frame, fps, T.box1Start);
   const box1Opacity = fadeIn(frame, T.box1Start);
-  const x1Scale   = quickPop(frame, fps, T.x1Start);
-  const x1Opacity = fadeIn(frame, T.x1Start, 5);
+  const x1Scale     = quickPop(frame, fps, T.x1Start);
+  const x1Opacity   = fadeIn(frame, T.x1Start, 5);
 
-  const box2Scale  = smoothPop(frame, fps, T.box2Start);
+  const box2Scale   = smoothPop(frame, fps, T.box2Start);
   const box2Opacity = fadeIn(frame, T.box2Start);
-  const x2Scale   = quickPop(frame, fps, T.x2Start);
-  const x2Opacity = fadeIn(frame, T.x2Start, 5);
+  const x2Scale     = quickPop(frame, fps, T.x2Start);
+  const x2Opacity   = fadeIn(frame, T.x2Start, 5);
 
   // ── Global fade-out ──────────────────────────────────────────────────────────
   const globalOpacity = interpolate(frame, [T.fadeStart, T.end], [1, 0], {
@@ -171,7 +172,6 @@ export const PainPointScene: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      {/* World — camera pan + global fade */}
       <div style={{
         position: 'absolute', top: 0, left: 0, width: 1920, height: 0,
         transform: `translateY(${cameraY}px)`,
@@ -190,13 +190,14 @@ export const PainPointScene: React.FC = () => {
             width: '100%', height: '100%',
             borderRadius: IMG_RADIUS,
             overflow: 'hidden',
+            background: SCENE_BG, // blends letterbox areas with scene background
             boxShadow: glowShadow,
             transform: floatTransform,
             transformOrigin: 'center',
           }}>
             <Img
               src={IMAGE_URL}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
             />
           </div>
         </div>
