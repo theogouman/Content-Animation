@@ -28,7 +28,7 @@ export const Scene1_Hook: React.FC = () => {
           fontFamily: FONT.main,
           fontSize: 96,
           fontWeight: 900,
-          color: COLORS.text,
+          color: COLORS.meetText,
           textAlign: 'center',
           lineHeight: 1.1,
         }}
@@ -42,7 +42,7 @@ export const Scene1_Hook: React.FC = () => {
           fontFamily: FONT.main,
           fontSize: 48,
           fontWeight: 400,
-          color: COLORS.textMuted,
+          color: COLORS.meetTextMuted,
           textAlign: 'center',
         }}
       >
