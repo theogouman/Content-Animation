@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Content Animations — Théo Gouman</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, 'Helvetica Neue', sans-serif;
+      background: #f6f3f3;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 60px 40px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    .subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 48px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: #fff;
+      border: 2px solid #e0625a;
+      border-radius: 14px;
+      padding: 24px 28px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: box-shadow 0.15s, transform 0.15s;
+    }
+    .card:hover {
+      box-shadow: 0 8px 32px rgba(224,98,90,0.15);
+      transform: translateY(-2px);
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .card-desc {
+      font-size: 13px;
+      color: #888;
+      line-height: 1.4;
+    }
+    .tag {
+      display: inline-block;
+      background: rgba(224,98,90,0.1);
+      color: #e0625a;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-top: 4px;
+      align-self: flex-start;
+    }
+  </style>
+</head>
+<body>
+  <h1>Content Animations</h1>
+  <p class="subtitle">Théo Gouman — Animations HTML pour contenus Instagram / YouTube</p>
+  <div class="grid">
+    <a class="card" href="google_meet.html" target="_blank">
+      <div class="card-title">Google Meet</div>
+      <div class="card-desc">5 participants rejoignent progressivement un appel. Layout dynamique 1→2→3→4→5.</div>
+      <span class="tag">~9s · boucle</span>
+    </a>
+  </div>
+</body>
+</html>
