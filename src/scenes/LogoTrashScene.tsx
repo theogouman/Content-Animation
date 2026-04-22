@@ -19,31 +19,35 @@ const T = {
   end:        150,
 } as const;
 
-// ─── Sizes — large enough to be visually impactful on 1080×1920 ──────────────
-const CX     = 540;
-const ROW1_Y = 840;   // Notion + Trash row
-const ROW2_Y = 1060;  // 3 logos row
+// ─── Layout — YouTube horizontal 1920×1080 ────────────────────────────────────
+const CX = 960;   // canvas center X (1920/2)
+const CY = 540;   // canvas center Y (1080/2)
 
-const NW  = 500; const NH = 140;  // Notion Meet (wide wordmark)
-const SS  = 200;                   // small logos (square)
-const TS  = 200;                   // trash (square)
-const GAP = 40;
+// All logos identical square size — maximum visual impact
+const S   = 300;   // uniform size for every logo/icon
+const G1  = 80;    // gap between Notion and Trash (row 1)
+const G2  = 70;    // gap between small logos (row 2)
 
-// Row 1 geometry: [Notion][gap][Trash] centered at CX
-const G1            = NW + GAP + TS;          // 740px
-const NOTION_SOLO_X = CX;                      // 540 — alone
-const NOTION_PAIR_X = CX - G1 / 2 + NW / 2;  // 540 - 370 + 250 = 420
-const TRASH_CX      = CX + G1 / 2 - TS / 2;  // 540 + 370 - 100 = 810
+// Row 1 vertical center: slightly above canvas center
+// Row 2 vertical center: below
+const ROW1_Y = CY - 120;   // 420
+const ROW2_Y = CY + 200;   // 740
 
-// Row 2 geometry: [Logo0][gap][Logo1][gap][Logo2] centered at CX
-const G2      = SS * 3 + GAP * 2;             // 680px
-const LOGO_CX = [
-  CX - G2 / 2 + SS / 2,   // 540 - 340 + 100 = 300
-  CX,                       // 540
-  CX + G2 / 2 - SS / 2,   // 540 + 340 - 100 = 780
+// Row 1: [Notion S×S] [G1] [Trash S×S] — centered at CX
+const GROUP1_W      = S + G1 + S;                   // 680px
+const NOTION_SOLO_X = CX;                             // 960 alone
+const NOTION_PAIR_X = CX - GROUP1_W / 2 + S / 2;    // 960-340+150 = 770
+const TRASH_CX      = CX + GROUP1_W / 2 - S / 2;    // 960+340-150 = 1150
+
+// Row 2: [Logo0 S×S] [G2] [Logo1 S×S] [G2] [Logo2 S×S] — centered at CX
+const GROUP2_W = S * 3 + G2 * 2;                     // 1040px
+const LOGO_CX  = [
+  CX - GROUP2_W / 2 + S / 2,   // 960-520+150 = 590
+  CX,                            // 960
+  CX + GROUP2_W / 2 - S / 2,   // 960+520-150 = 1330
 ];
 
-// ─── Smooth premium pop (damping 20 = snap without wild bounce) ───────────────
+// ─── Smooth premium pop ───────────────────────────────────────────────────────
 const smoothPop = (f: number, fps: number, delay: number) =>
   spring({ frame: Math.max(0, f - delay), fps, from: 0, to: 1, config: { damping: 20, stiffness: 320 } });
 
@@ -56,11 +60,12 @@ export const LogoTrashScene: React.FC = () => {
   const notionScale   = smoothPop(frame, fps, T.notionPop);
   const notionOpacity = interpolate(frame, [T.notionPop, T.notionPop + 7], [0, 1], { extrapolateRight: 'clamp' });
 
-  // X: solo(540) → paired(420) → centered again(540) during merge
   let notionX: number;
   if (frame >= T.mergeStart) {
+    // Re-centers — spring from pair position back to CX
     notionX = spring({ frame: frame - T.mergeStart, fps, from: NOTION_PAIR_X, to: CX, config: { damping: 16 } });
   } else if (frame >= T.trashPop) {
+    // Slides left to make room for trash
     notionX = spring({ frame: frame - T.trashPop, fps, from: NOTION_SOLO_X, to: NOTION_PAIR_X, config: { damping: 16 } });
   } else {
     notionX = NOTION_SOLO_X;
@@ -76,12 +81,11 @@ export const LogoTrashScene: React.FC = () => {
   const trashScale   = smoothPop(frame, fps, T.trashPop);
   const trashOpacity = interpolate(frame, [T.trashPop, T.trashPop + 7], [0, 1], { extrapolateRight: 'clamp' });
 
-  // "Eat" pulse when logos arrive
+  // Brief "eat" pulse
   const eatF     = Math.max(0, frame - (T.flyStart + 18));
-  const trashEat = interpolate(eatF, [0, 5, 12], [1, 1.2, 1], { extrapolateRight: 'clamp' });
+  const trashEat = interpolate(eatF, [0, 5, 12], [1, 1.18, 1], { extrapolateRight: 'clamp' });
 
-  // Merge: trash slides toward CX (same target as Notion) and fades out completely.
-  // Both converge at CX — since trash is behind Notion in z-order, it disappears behind it.
+  // Merge: trash slides to CX (same target as Notion) and fully fades
   const mergeF         = Math.max(0, frame - T.mergeStart);
   const trashMergeX    = spring({ frame: mergeF, fps, from: TRASH_CX, to: CX, config: { damping: 16 } });
   const trashMergeFade = interpolate(mergeF, [0, 20], [1, 0], {
@@ -92,10 +96,10 @@ export const LogoTrashScene: React.FC = () => {
   const trashFinalX       = frame >= T.mergeStart ? trashMergeX : TRASH_CX;
   const trashFinalOpacity = frame >= T.mergeStart ? trashMergeFade : trashOpacity;
   const trashFinalScale   = frame >= T.mergeStart
-    ? trashScale * interpolate(mergeF, [0, 20], [1, 0.5], { extrapolateRight: 'clamp' })
+    ? trashScale * interpolate(mergeF, [0, 20], [1, 0.4], { extrapolateRight: 'clamp' })
     : trashScale * trashEat;
 
-  // Hard cutoff — no ghost after merge
+  // Hard stop — no ghost element after merge completes
   const showTrash = frame >= T.trashPop && frame < T.mergeStart + 22;
 
   // ── Small logos (row 2) ──────────────────────────────────────────────────────
@@ -117,33 +121,32 @@ export const LogoTrashScene: React.FC = () => {
     });
     const flyX       = logo.soloX + (TRASH_CX - logo.soloX) * flyProg;
     const flyY       = ROW2_Y    + (ROW1_Y   - ROW2_Y)      * flyProg;
-    const flyScale   = 1 - flyProg;
     const flyOpacity = interpolate(flyF, [0, 16, 22], [1, 0.2, 0], { extrapolateRight: 'clamp' });
 
     const isFly = frame >= flyStart;
     return {
       url:     logo.url,
-      x:       isFly ? flyX       : logo.soloX,
-      y:       isFly ? flyY       : ROW2_Y,
-      scale:   isFly ? popScale * flyScale   : popScale,
-      opacity: isFly ? logoOpacity * flyOpacity : logoOpacity,
+      x:       isFly ? flyX             : logo.soloX,
+      y:       isFly ? flyY             : ROW2_Y,
+      scale:   isFly ? popScale * (1 - flyProg) : popScale,
+      opacity: isFly ? logoOpacity * flyOpacity  : logoOpacity,
       show:    frame >= logo.popAt,
     };
   });
 
   return (
     <AbsoluteFill>
-      {/* Row 2 — behind everything */}
+      {/* Row 2 — lowest z-order */}
       {animatedLogos.map((logo, i) =>
         logo.show ? (
           <div
             key={i}
             style={{
               position: 'absolute',
-              left: logo.x - SS / 2,
-              top: logo.y - SS / 2,
-              width: SS,
-              height: SS,
+              left: logo.x - S / 2,
+              top: logo.y - S / 2,
+              width: S,
+              height: S,
               opacity: logo.opacity,
               transform: `scale(${logo.scale})`,
               transformOrigin: 'center',
@@ -159,10 +162,10 @@ export const LogoTrashScene: React.FC = () => {
         <div
           style={{
             position: 'absolute',
-            left: trashFinalX - TS / 2,
-            top: ROW1_Y - TS / 2,
-            width: TS,
-            height: TS,
+            left: trashFinalX - S / 2,
+            top: ROW1_Y - S / 2,
+            width: S,
+            height: S,
             opacity: trashFinalOpacity,
             transform: `scale(${trashFinalScale})`,
             transformOrigin: 'center',
@@ -177,10 +180,10 @@ export const LogoTrashScene: React.FC = () => {
         <div
           style={{
             position: 'absolute',
-            left: notionX - NW / 2,
-            top: ROW1_Y - NH / 2,
-            width: NW,
-            height: NH,
+            left: notionX - S / 2,
+            top: ROW1_Y - S / 2,
+            width: S,
+            height: S,
             opacity: notionOpacity * notionFade,
             transform: `scale(${notionScale})`,
             transformOrigin: 'center',

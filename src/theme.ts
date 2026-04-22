@@ -21,6 +21,13 @@ export const VIDEO = {
   fps: 30,
 };
 
+// YouTube horizontal (16:9)
+export const VIDEO_YOUTUBE = {
+  width: 1920,
+  height: 1080,
+  fps: 30,
+};
+
 // Meet window geometry
 const WIN_H = 560;
 const WIN_CHROME = 28;

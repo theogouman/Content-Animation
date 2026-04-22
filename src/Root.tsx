@@ -1,7 +1,7 @@
 import { Composition } from 'remotion';
 import { LogoVideo, LOGO_TOTAL_FRAMES } from './LogoVideo';
 import { MainVideo, totalFrames } from './MainVideo';
-import { VIDEO } from './theme';
+import { VIDEO, VIDEO_YOUTUBE } from './theme';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -18,9 +18,9 @@ export const RemotionRoot: React.FC = () => {
         id="LogoAnimation"
         component={LogoVideo}
         durationInFrames={LOGO_TOTAL_FRAMES}
-        fps={VIDEO.fps}
-        width={VIDEO.width}
-        height={VIDEO.height}
+        fps={VIDEO_YOUTUBE.fps}
+        width={VIDEO_YOUTUBE.width}
+        height={VIDEO_YOUTUBE.height}
       />
     </>
   );
