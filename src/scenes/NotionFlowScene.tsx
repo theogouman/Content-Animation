@@ -43,11 +43,11 @@ const NBOX_H    = NOTION_H + 2 * NOTION_P; // 138
 const NBOX_Y    = 280;
 
 // Node 1 — Screenshot
-const IMG_W   = 640;
-const IMG_H   = 360;
-const IMG_P   = 18;
-const BOX1_W  = IMG_W + 2 * IMG_P; // 676
-const BOX1_H  = IMG_H + 2 * IMG_P; // 396
+const IMG_W   = 320;
+const IMG_H   = 200;
+const IMG_P   = 16;
+const BOX1_W  = IMG_W + 2 * IMG_P; // 352
+const BOX1_H  = IMG_H + 2 * IMG_P; // 232
 const BOX1_Y  = 870;
 
 // Node 2 — Text bars
