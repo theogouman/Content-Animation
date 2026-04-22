@@ -1,18 +1,21 @@
+import { useEffect, useState } from 'react';
 import {
   AbsoluteFill,
   Easing,
   Img,
+  continueRender,
+  delayRender,
   interpolate,
   spring,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
+import { getImageDimensions } from '@remotion/media-utils';
 
 // ─── Assets ───────────────────────────────────────────────────────────────────
 const IMAGE_URL = 'https://res.cloudinary.com/dceobxyts/image/upload/v1776887625/Capture_d_e%CC%81cran_2026-04-22_a%CC%80_21.36.18_znjbf4.png';
 
-const ACCENT = '#e0625a';
-const SCENE_BG = '#f6f3f3';
+const ACCENT   = '#e0625a';
 
 // ─── Timeline (185 frames ≈ 6.2 s @ 30 fps) ──────────────────────────────────
 const T = {
@@ -29,29 +32,21 @@ const T = {
   end:         185,
 } as const;
 
-// ─── World layout ─────────────────────────────────────────────────────────────
-const CX = 960;
-
-// Image — larger container, objectFit:contain to show full image
-const IMG_W      = 780;
-const IMG_H      = 490; // ~16:10 ratio, covers most common screenshot formats
+// ─── World constants ──────────────────────────────────────────────────────────
+const CX       = 960;
+const IMAGE_Y  = 300;   // world center Y of image (fixed)
+const MAX_W    = 720;   // max image display width
+const MAX_H    = 520;   // max image display height
 const IMG_RADIUS = 20;
-const IMAGE_Y    = 300; // world center Y
-
-// Text boxes — positioned below image with breathing room
-const BOX1_Y = 720;
-const BOX2_Y = 832;
-
-const CAM_0 = 540 - IMAGE_Y;                        // +240 — image centered
-const CAM_1 = 540 - BOX1_Y;                         // -180 — box 1 centered
-const CAM_2 = 540 - Math.round((BOX1_Y + BOX2_Y) / 2); // -236 — both boxes centered
 
 // ─── Text box constants ───────────────────────────────────────────────────────
-const BOX_PAD_V  = 26;
-const BOX_PAD_H  = 42;
+const BOX_PAD_V  = 30;
+const BOX_PAD_H  = 48;
 const BOX_RADIUS = 16;
-const BOX_FONT   = 36;
+const BOX_FONT   = 40;
 const BOX_BORDER = 2;
+const BOX_HALF_H = BOX_FONT / 2 + BOX_PAD_V + BOX_BORDER; // estimated half-height
+const BOX_GAP    = 24;
 const BOX_FONT_STACK = "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -87,7 +82,7 @@ const XBadge: React.FC<{ scale: number; opacity: number }> = ({ scale, opacity }
   </div>
 );
 
-// ─── Text card — white bg, black text, red border ────────────────────────────
+// ─── Text card ────────────────────────────────────────────────────────────────
 const TextCard: React.FC<{
   y: number; text: string;
   scale: number; opacity: number;
@@ -109,7 +104,7 @@ const TextCard: React.FC<{
     fontWeight: 600,
     lineHeight: 1,
     whiteSpace: 'nowrap',
-    boxShadow: '0 4px 28px rgba(0,0,0,0.10)',
+    boxShadow: '0 4px 32px rgba(0,0,0,0.10)',
   }}>
     {text}
     {showX && <XBadge scale={xScale} opacity={xOpacity} />}
@@ -120,6 +115,31 @@ const TextCard: React.FC<{
 export const PainPointScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+
+  // ── Fetch exact image dimensions so the glow frame hugs the image precisely ──
+  const [imgHandle] = useState(() => delayRender('image-dimensions'));
+  const [imgW, setImgW] = useState(MAX_W);
+  const [imgH, setImgH] = useState(MAX_H);
+
+  useEffect(() => {
+    getImageDimensions(IMAGE_URL)
+      .then(({ width, height }) => {
+        const scale = Math.min(MAX_W / width, MAX_H / height);
+        setImgW(Math.round(width  * scale));
+        setImgH(Math.round(height * scale));
+        continueRender(imgHandle);
+      })
+      .catch(() => continueRender(imgHandle));
+  }, [imgHandle]);
+
+  // ── Derived layout (updates once dimensions are known) ───────────────────────
+  const imageBottom = IMAGE_Y + imgH / 2;
+  const box1Y = imageBottom + 120 + BOX_HALF_H;
+  const box2Y = box1Y + BOX_HALF_H + BOX_GAP + BOX_HALF_H;
+
+  const cam0 = 540 - IMAGE_Y;
+  const cam1 = 540 - box1Y;
+  const cam2 = 540 - Math.round((box1Y + box2Y) / 2);
 
   // ── Image slide-in ───────────────────────────────────────────────────────────
   const imageWorldY = spring({ frame, fps, from: 960, to: IMAGE_Y,
@@ -150,7 +170,7 @@ export const PainPointScene: React.FC = () => {
   const cameraY = interpolate(
     frame,
     [T.cam1Start, T.cam1End, T.cam2Start, T.cam2End],
-    [CAM_0,       CAM_1,     CAM_1,       CAM_2],
+    [cam0,        cam1,      cam1,        cam2],
     { easing: Easing.inOut(Easing.cubic), extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
 
@@ -178,26 +198,25 @@ export const PainPointScene: React.FC = () => {
         opacity: globalOpacity,
       }}>
 
-        {/* ── Image ── */}
+        {/* ── Image — container sized to exact image ratio ── */}
         <div style={{
           position: 'absolute',
-          left: CX - IMG_W / 2,
-          top: imageWorldY - IMG_H / 2,
-          width: IMG_W, height: IMG_H,
+          left: CX - imgW / 2,
+          top: imageWorldY - imgH / 2,
+          width: imgW, height: imgH,
           opacity: imageOpacity,
         }}>
           <div style={{
             width: '100%', height: '100%',
             borderRadius: IMG_RADIUS,
             overflow: 'hidden',
-            background: SCENE_BG, // blends letterbox areas with scene background
             boxShadow: glowShadow,
             transform: floatTransform,
             transformOrigin: 'center',
           }}>
             <Img
               src={IMAGE_URL}
-              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+              style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }}
             />
           </div>
         </div>
@@ -205,7 +224,7 @@ export const PainPointScene: React.FC = () => {
         {/* ── Box 1 ── */}
         {frame >= T.box1Start && (
           <TextCard
-            y={BOX1_Y}
+            y={box1Y}
             text="Tu ne prends pas de notes"
             scale={box1Scale}
             opacity={box1Opacity}
@@ -218,7 +237,7 @@ export const PainPointScene: React.FC = () => {
         {/* ── Box 2 ── */}
         {frame >= T.box2Start && (
           <TextCard
-            y={BOX2_Y}
+            y={box2Y}
             text="Tu perds ton temps à écrire tes notes"
             scale={box2Scale}
             opacity={box2Opacity}
