@@ -54,9 +54,9 @@ export const RemotionRoot: React.FC = () => {
         id="MaskRevealAnimation"
         component={MaskRevealVideo}
         durationInFrames={MASK_REVEAL_TOTAL_FRAMES}
-        fps={VIDEO_YOUTUBE.fps}
-        width={VIDEO_YOUTUBE.width}
-        height={VIDEO_YOUTUBE.height}
+        fps={VIDEO.fps}
+        width={VIDEO.width}
+        height={VIDEO.height}
       />
     </>
   );
