@@ -3,6 +3,7 @@ import { CompetitorVideo, COMPETITOR_TOTAL_FRAMES } from './CompetitorVideo';
 import { LogoVideo, LOGO_TOTAL_FRAMES } from './LogoVideo';
 import { MainVideo, totalFrames } from './MainVideo';
 import { MaskRevealVideo, MASK_REVEAL_TOTAL_FRAMES } from './MaskRevealVideo';
+import { NotionArrowVideo, NOTION_ARROW_TOTAL_FRAMES } from './NotionArrowVideo';
 import { NotionFlowVideo, NOTION_FLOW_TOTAL_FRAMES } from './NotionFlowVideo';
 import { PainPointVideo, PAIN_POINT_TOTAL_FRAMES } from './PainPointVideo';
 import { VIDEO, VIDEO_YOUTUBE } from './theme';
@@ -54,6 +55,14 @@ export const RemotionRoot: React.FC = () => {
         id="MaskRevealAnimation"
         component={MaskRevealVideo}
         durationInFrames={MASK_REVEAL_TOTAL_FRAMES}
+        fps={VIDEO.fps}
+        width={VIDEO.width}
+        height={VIDEO.height}
+      />
+      <Composition
+        id="NotionArrowAnimation"
+        component={NotionArrowVideo}
+        durationInFrames={NOTION_ARROW_TOTAL_FRAMES}
         fps={VIDEO.fps}
         width={VIDEO.width}
         height={VIDEO.height}
